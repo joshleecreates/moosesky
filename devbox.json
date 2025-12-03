@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.13.7/.schema/devbox.schema.json",
+  "packages": [
+    "python312",
+    "nodejs_20",
+    "github:514-labs/moosestack#moose-cli"
+  ],
+  "shell": {
+    "init_hook": [
+      "echo 'Setting up moosestack development environment...'",
+      "",
+      "# Verify installations",
+      "echo ''",
+      "echo 'Environment versions:'",
+      "python --version",
+      "node --version",
+      "docker --version",
+      "moose-cli --version",
+      "",
+      "echo ''",
+      "echo 'Development environment ready!'",
+      "echo 'Use \"moose-cli init <project-name> [typescript|python]\" to create a new MooseStack project'",
+      "echo 'Or run \"devbox run dev\" to start the development environment'"
+    ],
+    "scripts": {
+      "test": "moose-cli --version",
+      "dev": "moose-cli dev",
+      "build": "moose-cli build",
+      "logs": "moose-cli logs",
+      "clean": "docker compose down -v",
+      "workflow": "cd stats && moose-cli workflow run $1"
+    }
+  },
+  "env": {
+    "DOCKER_HOST": "unix:///var/run/docker.sock"
+  }
+}

@@ -1,6 +1,19 @@
-export * from "./ingest/models";
-export * from "./ingest/transforms";
+// Bluesky Firehose Word Trends Application
 
-export * from "./apis/bar";
-export * from "./views/barAggregated";
-export * from "./workflows/generator";
+// Data models and pipelines
+export * from "./ingest/bluesky-models";
+
+// Word extraction transform
+export * from "./ingest/bluesky-transforms";
+
+// Materialized view for trends
+export * from "./views/wordTrends";
+
+// REST API for trends
+export * from "./apis/trends";
+
+// Firehose ingestion workflow
+export * from "./workflows/firehose";
+
+// Static file serving for dashboard
+export * from "./apis/dashboard";
