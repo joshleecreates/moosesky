@@ -518,14 +518,19 @@
       if (!word) return;
 
       word = word.toLowerCase().trim();
-      if (currentWords.includes(word)) return;
+      if (currentWords.includes(word)) {
+        console.log(`Word "${word}" already in comparison`);
+        return;
+      }
       if (currentWords.length >= 5) {
         alert('Maximum 5 words for comparison');
         return;
       }
 
+      console.log(`Adding "${word}" to comparison. Current words:`, currentWords);
       currentWords.push(word);
       await loadWordData(word);
+      console.log(`Chart data after loading "${word}":`, chartData);
       renderChart();
       updateCompareTags();
     }
@@ -544,8 +549,11 @@
       const from = new Date(to.getTime() - timeRangeMinutes * 60 * 1000);
 
       try {
-        const res = await fetch(`${API_BASE}/search?word=${encodeURIComponent(word)}&from=${from.toISOString()}&to=${to.toISOString()}`);
+        const url = `${API_BASE}/search?word=${encodeURIComponent(word)}&from=${from.toISOString()}&to=${to.toISOString()}`;
+        console.log(`Fetching: ${url}`);
+        const res = await fetch(url);
         const data = await res.json();
+        console.log(`Response for "${word}":`, data);
 
         if (data.success) {
           // Parse and aggregate data by timestamp
@@ -731,13 +739,20 @@
     // Event listeners
     document.getElementById('search-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      const word = document.getElementById('word-input').value;
+      const input = document.getElementById('word-input');
+      const word = input.value;
       searchWord(word);
+      input.value = ''; // Clear for next word
+      input.placeholder = `Comparing: ${word} - enter another word`;
     });
 
-    document.getElementById('add-compare').addEventListener('click', () => {
+    document.getElementById('add-compare').addEventListener('click', async () => {
       const word = document.getElementById('word-input').value;
-      addCompareWord(word);
+      if (!word.trim()) {
+        alert('Enter a word first');
+        return;
+      }
+      await addCompareWord(word);
       document.getElementById('word-input').value = '';
     });
 

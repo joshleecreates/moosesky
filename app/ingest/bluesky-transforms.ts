@@ -4,7 +4,6 @@ import {
   BlueskyPost,
   WordOccurrence,
 } from "./bluesky-models";
-import { createHash } from "crypto";
 
 // Common stop words to filter out (not meaningful for trend analysis)
 const STOP_WORDS = new Set([
@@ -190,16 +189,6 @@ function truncateToInterval(date: Date): Date {
   );
 }
 
-/**
- * Generate a unique ID for a word occurrence (word + 10-second interval)
- */
-function generateOccurrenceId(word: string, interval: Date): string {
-  const hash = createHash("md5")
-    .update(`${word}:${interval.toISOString()}`)
-    .digest("hex")
-    .substring(0, 16);
-  return hash;
-}
 
 /**
  * Extract and normalize words from text
@@ -254,9 +243,8 @@ BlueskyPostPipeline.stream!.addTransform(
     const occurrences: WordOccurrence[] = [];
     wordCounts.forEach((count, word) => {
       occurrences.push({
-        id: generateOccurrenceId(word, interval),
-        word,
         intervalTimestamp: interval,
+        word,
         count,
       });
     });
