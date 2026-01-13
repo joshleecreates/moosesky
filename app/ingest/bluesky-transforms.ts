@@ -155,6 +155,7 @@ const STOP_WORDS = new Set([
   "say",
   "said",
   "really",
+  "trump",
   "much",
   "one",
   "two",

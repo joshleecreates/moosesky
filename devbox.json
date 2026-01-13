@@ -28,7 +28,7 @@
       "build": "moose-cli build",
       "logs": "moose-cli logs",
       "clean": "docker compose down -v",
-      "workflow": "cd stats && moose-cli workflow run $1"
+      "workflow": "moose-cli workflow run $1"
     }
   },
   "env": {
