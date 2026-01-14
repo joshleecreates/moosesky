@@ -2,32 +2,24 @@ import { Task, Workflow } from "@514labs/moose-lib";
 import { Context } from "@temporalio/activity";
 import { createClient } from "redis";
 import WebSocket from "ws";
-import { BlueskyPost } from "../ingest/bluesky-models";
+import { BlueskyPost, BlueskyPostPipeline } from "../ingest/bluesky-models";
 
 // JetStream endpoint for Bluesky firehose (JSON format)
 const JETSTREAM_BASE_URL =
   "wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post";
 
-// Moose ingest endpoint
-const INGEST_URL = "http://localhost:4000/ingest/BlueskyPost";
-
 // Redis key for cursor persistence
 const CURSOR_KEY = "bluesky:firehose:cursor";
 
-// Batching configuration
-const BATCH_SIZE = 100; // Send posts in batches of 100
-const BATCH_INTERVAL_MS = 1000; // Or every 1 second, whichever comes first
-const MAX_CONCURRENT_REQUESTS = 5; // Limit concurrent HTTP requests
+// Batching for Kafka efficiency
+const BATCH_SIZE = 100;
+const BATCH_INTERVAL_MS = 500;
+let postBatch: BlueskyPost[] = [];
+let batchTimer: NodeJS.Timeout | null = null;
 
 // Stats tracking
 let postsProcessed = 0;
-let postsErrored = 0;
 let lastStatsTime = Date.now();
-
-// Batch queue
-let postBatch: BlueskyPost[] = [];
-let batchTimer: NodeJS.Timeout | null = null;
-let activeRequests = 0;
 
 // Current cursor (time_us from last message, in microseconds)
 let currentCursor: number = 0;
@@ -125,78 +117,6 @@ function parseJetStreamMessage(data: string): BlueskyPost | null {
 }
 
 /**
- * Send a batch of posts to the Moose ingest endpoint
- */
-async function sendBatch(posts: BlueskyPost[]): Promise<void> {
-  if (posts.length === 0) return;
-
-  // Wait if too many concurrent requests
-  while (activeRequests >= MAX_CONCURRENT_REQUESTS) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-
-  activeRequests++;
-  try {
-    // Send posts one at a time but with controlled concurrency
-    // Moose ingest endpoint expects single objects
-    for (const post of posts) {
-      const response = await fetch(INGEST_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(post),
-      });
-
-      if (response.ok) {
-        postsProcessed++;
-      } else {
-        postsErrored++;
-      }
-    }
-  } catch (error) {
-    console.error("[Firehose] Batch ingest error:", error);
-    postsErrored += posts.length;
-  } finally {
-    activeRequests--;
-  }
-}
-
-/**
- * Queue a post for batched ingestion
- */
-function queuePost(post: BlueskyPost): void {
-  postBatch.push(post);
-
-  // Send batch if it reaches the size limit
-  if (postBatch.length >= BATCH_SIZE) {
-    flushBatch();
-  }
-
-  // Start timer for time-based flushing if not already running
-  if (!batchTimer) {
-    batchTimer = setTimeout(() => {
-      flushBatch();
-    }, BATCH_INTERVAL_MS);
-  }
-}
-
-/**
- * Flush the current batch
- */
-function flushBatch(): void {
-  if (batchTimer) {
-    clearTimeout(batchTimer);
-    batchTimer = null;
-  }
-
-  if (postBatch.length > 0) {
-    const batch = postBatch;
-    postBatch = [];
-    // Fire and forget - don't await to avoid blocking message processing
-    sendBatch(batch);
-  }
-}
-
-/**
  * Log stats periodically
  */
 function logStats() {
@@ -205,18 +125,49 @@ function logStats() {
 
   if (elapsed >= 60) {
     const rate = postsProcessed / elapsed;
-    console.log(
-      `[Firehose] Stats: ${postsProcessed} posts (${rate.toFixed(1)}/sec), ${postsErrored} errors`
-    );
+    console.log(`[Firehose] Stats: ${postsProcessed} posts (${rate.toFixed(1)}/sec)`);
     postsProcessed = 0;
-    postsErrored = 0;
     lastStatsTime = now;
   }
 }
 
 /**
+ * Flush batch to Kafka
+ */
+async function flushBatch() {
+  if (batchTimer) {
+    clearTimeout(batchTimer);
+    batchTimer = null;
+  }
+
+  if (postBatch.length === 0) return;
+
+  const batch = postBatch;
+  postBatch = [];
+
+  try {
+    await BlueskyPostPipeline.stream!.send(batch);
+    postsProcessed += batch.length;
+  } catch (err) {
+    console.error("[Firehose] Failed to send batch:", err);
+  }
+}
+
+/**
+ * Queue post for batched sending
+ */
+function queuePost(post: BlueskyPost) {
+  postBatch.push(post);
+
+  if (postBatch.length >= BATCH_SIZE) {
+    flushBatch();
+  } else if (!batchTimer) {
+    batchTimer = setTimeout(flushBatch, BATCH_INTERVAL_MS);
+  }
+}
+
+/**
  * Connect to JetStream and process posts
- * @param cancellationSignal - AbortSignal to handle graceful shutdown
  */
 async function connectAndProcess(cancellationSignal: AbortSignal): Promise<"disconnected" | "cancelled"> {
   let url = JETSTREAM_BASE_URL;
@@ -250,11 +201,10 @@ async function connectAndProcess(cancellationSignal: AbortSignal): Promise<"disc
       try {
         const rawMsg = JSON.parse(message);
         if (rawMsg.time_us) {
-          const cursor: number = rawMsg.time_us;
-          currentCursor = cursor;
+          currentCursor = rawMsg.time_us;
           messageCount++;
           if (messageCount % 1000 === 0) {
-            saveCursor(cursor);
+            saveCursor(currentCursor);
             logStats();
           }
         }
@@ -269,21 +219,14 @@ async function connectAndProcess(cancellationSignal: AbortSignal): Promise<"disc
 
     ws.on("error", (error) => {
       console.error("[Firehose] WebSocket error:", error);
-      postsErrored++;
     });
 
     ws.on("close", async (code, reason) => {
       console.log(`[Firehose] Connection closed: ${code} ${reason.toString()}`);
       cancellationSignal.removeEventListener("abort", onCancelled);
 
-      // Flush any remaining posts in the batch
-      flushBatch();
-
-      // Wait for active requests to complete (with timeout)
-      const waitStart = Date.now();
-      while (activeRequests > 0 && Date.now() - waitStart < 5000) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
+      // Flush remaining posts
+      await flushBatch();
 
       if (currentCursor > 0) {
         await saveCursor(currentCursor);
