@@ -1,6 +1,5 @@
-import { Task, Workflow } from "@514labs/moose-lib";
+import { Task, Workflow, MooseCache } from "@514labs/moose-lib";
 import { Context } from "@temporalio/activity";
-import { createClient } from "redis";
 import WebSocket from "ws";
 import { BlueskyPost, BlueskyPostPipeline } from "../ingest/bluesky-models";
 
@@ -24,22 +23,10 @@ let lastStatsTime = Date.now();
 // Current cursor (time_us from last message, in microseconds)
 let currentCursor: number = 0;
 
-// Redis client for cursor persistence
-let redisClient: ReturnType<typeof createClient> | null = null;
-
-async function getRedisClient() {
-  if (!redisClient) {
-    redisClient = createClient({ url: "redis://127.0.0.1:6379" });
-    redisClient.on("error", (err) => console.error("[Redis] Error:", err));
-    await redisClient.connect();
-  }
-  return redisClient;
-}
-
 async function saveCursor(cursor: number) {
   try {
-    const redis = await getRedisClient();
-    await redis.set(CURSOR_KEY, cursor.toString());
+    const cache = await MooseCache.get();
+    await cache.set(CURSOR_KEY, cursor.toString(), 60 * 60 * 24 * 7); // 7 day TTL
   } catch (err) {
     console.error("[Firehose] Failed to save cursor:", err);
   }
@@ -47,8 +34,8 @@ async function saveCursor(cursor: number) {
 
 async function loadCursor(): Promise<number> {
   try {
-    const redis = await getRedisClient();
-    const value = await redis.get(CURSOR_KEY);
+    const cache = await MooseCache.get();
+    const value = await cache.get<string>(CURSOR_KEY);
     if (value) {
       return parseInt(value, 10);
     }
@@ -56,11 +43,11 @@ async function loadCursor(): Promise<number> {
     console.error("[Firehose] Failed to load cursor:", err);
   }
 
-  // Default to 1 hour ago (JetStream cursor is in microseconds)
-  const oneHourAgoMs = Date.now() - 60 * 60 * 1000;
-  const oneHourAgoUs = oneHourAgoMs * 1000;
-  console.log(`[Firehose] No cursor found, starting from 1 hour ago`);
-  return oneHourAgoUs;
+  // Default to 24 hours ago (JetStream cursor is in microseconds)
+  const twentyFourHoursAgoMs = Date.now() - 24 * 60 * 60 * 1000;
+  const twentyFourHoursAgoUs = twentyFourHoursAgoMs * 1000;
+  console.log(`[Firehose] No cursor found, starting from 24 hours ago`);
+  return twentyFourHoursAgoUs;
 }
 
 /**
