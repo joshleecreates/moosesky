@@ -3,7 +3,6 @@
   "packages": [
     "python312",
     "nodejs_20",
-    "github:514-labs/moosestack#moose-cli"
   ],
   "shell": {
     "init_hook": [

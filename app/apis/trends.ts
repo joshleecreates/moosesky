@@ -1,7 +1,6 @@
 import express from "express";
 import {
   WebApp,
-  expressMiddleware,
   getMooseUtils,
   MooseCache,
 } from "@514labs/moose-lib";
@@ -16,7 +15,6 @@ function formatDateForCH(date: Date): string {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(expressMiddleware());
 
 // Logging middleware
 app.use((req, res, next) => {
@@ -54,14 +52,7 @@ app.get("/health", (_req, res) => {
  *   - to: End timestamp (optional, defaults to now)
  */
 app.get("/search", async (req, res) => {
-  const moose = getMooseUtils(req);
-  if (!moose) {
-    return res
-      .status(500)
-      .json({ error: "MooseStack utilities not available" });
-  }
-
-  const { client, sql } = moose;
+  const { client, sql } = await getMooseUtils();
   const word = (req.query.word as string)?.toLowerCase();
 
   if (!word) {
@@ -119,14 +110,7 @@ app.get("/search", async (req, res) => {
  *   - limit: Number of words to return (optional, defaults to 20)
  */
 app.get("/top", async (req, res) => {
-  const moose = getMooseUtils(req);
-  if (!moose) {
-    return res
-      .status(500)
-      .json({ error: "MooseStack utilities not available" });
-  }
-
-  const { client, sql } = moose;
+  const { client, sql } = await getMooseUtils();
   const minutes = parseInt(req.query.minutes as string) || 5;
   const limit = parseInt(req.query.limit as string) || 20;
 
@@ -176,14 +160,7 @@ app.get("/top", async (req, res) => {
  *   - to: End timestamp (optional, defaults to now)
  */
 app.get("/compare", async (req, res) => {
-  const moose = getMooseUtils(req);
-  if (!moose) {
-    return res
-      .status(500)
-      .json({ error: "MooseStack utilities not available" });
-  }
-
-  const { client, sql } = moose;
+  const { client, sql } = await getMooseUtils();
   const wordsParam = req.query.words as string;
 
   if (!wordsParam) {
@@ -258,14 +235,7 @@ app.get("/compare", async (req, res) => {
  * GET /stats - Get overall statistics
  */
 app.get("/stats", async (req, res) => {
-  const moose = getMooseUtils(req);
-  if (!moose) {
-    return res
-      .status(500)
-      .json({ error: "MooseStack utilities not available" });
-  }
-
-  const { client, sql } = moose;
+  const { client, sql } = await getMooseUtils();
 
   try {
     const cache = await MooseCache.get();

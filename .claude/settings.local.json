@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "WebFetch(domain:docs.moosejs.com)"
+      "WebFetch(domain:docs.moosejs.com)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []
