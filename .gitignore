@@ -1,7 +1,7 @@
-.moose
 node_modules
-dist
-coverage
-.ts-node
 
-.venv
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+devbox.lock
