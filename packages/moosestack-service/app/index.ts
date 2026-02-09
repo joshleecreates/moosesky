@@ -14,6 +14,3 @@ export * from "./apis/trends";
 
 // Firehose ingestion workflow
 export * from "./workflows/firehose";
-
-// MCP server for AI tools
-export * from "./apis/mcp";

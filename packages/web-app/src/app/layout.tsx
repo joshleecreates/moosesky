@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ChatLayoutWrapper } from "@/components/layout/chat-layout-wrapper";
+import { ContentHeader } from "@/components/layout/content-header";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +35,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ChatLayoutWrapper>{children}</ChatLayoutWrapper>
+          <div className="flex flex-col min-h-screen">
+            <ContentHeader />
+            <main className="bg-background">{children}</main>
+          </div>
         </ThemeProvider>
       </body>
     </html>
