@@ -16,7 +16,7 @@ When users ask questions:
 
 Common useful queries:
 - Top trending words: SELECT word, sum(totalCount) as total FROM WordTrends WHERE interval >= now() - INTERVAL 5 MINUTE GROUP BY word ORDER BY total DESC LIMIT 20
-- Word frequency over time: SELECT interval, totalCount FROM WordTrends WHERE word = 'example' AND interval >= now() - INTERVAL 1 HOUR ORDER BY interval
+- Word frequency over time: SELECT interval, sum(totalCount) as totalCount FROM WordTrends WHERE word = 'example' AND interval >= now() - INTERVAL 1 HOUR GROUP BY interval ORDER BY interval
 - Total post count: SELECT count() FROM BlueskyPost
 - Recent posts containing a word: SELECT text, createdAt FROM BlueskyPost WHERE text ILIKE '%word%' ORDER BY createdAt DESC LIMIT 10
 

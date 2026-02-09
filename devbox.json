@@ -3,6 +3,7 @@
   "packages": [
     "python312",
     "nodejs_20",
+    "pnpm"
   ],
   "shell": {
     "init_hook": [
@@ -13,21 +14,24 @@
       "echo 'Environment versions:'",
       "python --version",
       "node --version",
+      "pnpm --version",
       "docker --version",
-      "moose-cli --version",
       "",
       "echo ''",
       "echo 'Development environment ready!'",
-      "echo 'Use \"moose-cli init <project-name> [typescript|python]\" to create a new MooseStack project'",
-      "echo 'Or run \"devbox run dev\" to start the development environment'"
+      "echo 'Run \"devbox run install\" to install dependencies'",
+      "echo 'Then run \"devbox run dev\" to start the development environment'"
     ],
     "scripts": {
-      "test": "moose-cli --version",
-      "dev": "moose-cli dev",
-      "build": "moose-cli build",
-      "logs": "moose-cli logs",
+      "install": "pnpm install",
+      "dev": "pnpm dev",
+      "dev:moose": "pnpm dev:moose",
+      "dev:web": "pnpm dev:web",
+      "build": "pnpm --filter moosestack-service moose build",
+      "logs": "pnpm --filter moosestack-service moose logs",
       "clean": "docker compose down -v",
-      "workflow": "moose-cli workflow run $1"
+      "workflow": "pnpm --filter moosestack-service moose workflow run $1",
+      "workflow:cancel": "pnpm --filter moosestack-service moose workflow cancel $1"
     }
   },
   "env": {

@@ -1,5 +1,5 @@
 import typia from "typia";
-import { MaterializedView, sql } from "@514labs/moose-lib";
+import { MaterializedView, ClickHouseEngines, sql } from "@514labs/moose-lib";
 import { WordOccurrencePipeline } from "../ingest/models";
 
 /**
@@ -22,6 +22,7 @@ const wordColumns = wordTable.columns;
 export const WordTrendsMV = new MaterializedView<WordTrend>({
   tableName: "WordTrends",
   materializedViewName: "WordTrends_MV",
+  engine: ClickHouseEngines.SummingMergeTree,
   orderByFields: ["word", "interval"],
   selectStatement: sql`SELECT
     ${wordColumns.word} as word,

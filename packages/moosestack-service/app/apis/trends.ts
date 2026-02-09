@@ -79,11 +79,12 @@ app.get("/search", async (req, res) => {
     const query = sql`
       SELECT
         ${WordTrendsMV.targetTable.columns.interval} as interval,
-        ${WordTrendsMV.targetTable.columns.totalCount} as count
+        sum(${WordTrendsMV.targetTable.columns.totalCount}) as count
       FROM ${WordTrendsMV.targetTable}
       WHERE ${WordTrendsMV.targetTable.columns.word} = ${word}
         AND ${WordTrendsMV.targetTable.columns.interval} >= ${formatDateForCH(from)}
         AND ${WordTrendsMV.targetTable.columns.interval} <= ${formatDateForCH(to)}
+      GROUP BY ${WordTrendsMV.targetTable.columns.interval}
       ORDER BY ${WordTrendsMV.targetTable.columns.interval} ASC
     `;
 
@@ -209,11 +210,12 @@ app.get("/compare", async (req, res) => {
       const query = sql`
         SELECT
           ${WordTrendsMV.targetTable.columns.interval} as interval,
-          ${WordTrendsMV.targetTable.columns.totalCount} as count
+          sum(${WordTrendsMV.targetTable.columns.totalCount}) as count
         FROM ${WordTrendsMV.targetTable}
         WHERE ${WordTrendsMV.targetTable.columns.word} = ${word}
           AND ${WordTrendsMV.targetTable.columns.interval} >= ${formatDateForCH(from)}
           AND ${WordTrendsMV.targetTable.columns.interval} <= ${formatDateForCH(to)}
+        GROUP BY ${WordTrendsMV.targetTable.columns.interval}
         ORDER BY ${WordTrendsMV.targetTable.columns.interval} ASC
       `;
 
