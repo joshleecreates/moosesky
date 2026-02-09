@@ -2,7 +2,6 @@ import express from "express";
 import {
   WebApp,
   getMooseUtils,
-  MooseCache,
 } from "@514labs/moose-lib";
 import { WordTrendsMV } from "../views/wordTrends";
 
@@ -68,14 +67,6 @@ app.get("/search", async (req, res) => {
   const to = req.query.to ? new Date(req.query.to as string) : now;
 
   try {
-    // Check cache first
-    const cache = await MooseCache.get();
-    const cacheKey = `trends:search:${word}:${from.toISOString()}:${to.toISOString()}`;
-    const cached = await cache.get<any[]>(cacheKey);
-    if (cached) {
-      return res.json({ success: true, cached: true, data: cached });
-    }
-
     const query = sql`
       SELECT
         ${WordTrendsMV.targetTable.columns.interval} as interval,
@@ -90,9 +81,6 @@ app.get("/search", async (req, res) => {
 
     const result = await client.query.execute(query);
     const data = await result.json();
-
-    // Cache for 30 seconds
-    await cache.set(cacheKey, data, 30);
 
     res.json({ success: true, word, from, to, data });
   } catch (error) {
@@ -120,14 +108,6 @@ app.get("/top", async (req, res) => {
     : null;
 
   try {
-    // Check cache first
-    const cache = await MooseCache.get();
-    const cacheKey = `trends:top:${minutes}:${limit}:${minLength ?? "none"}`;
-    const cached = await cache.get<any[]>(cacheKey);
-    if (cached) {
-      return res.json({ success: true, cached: true, data: cached });
-    }
-
     const cutoff = new Date(Date.now() - minutes * 60 * 1000);
 
     const query = sql`
@@ -144,9 +124,6 @@ app.get("/top", async (req, res) => {
 
     const result = await client.query.execute(query);
     const data = await result.json();
-
-    // Cache for 15 seconds for top trending
-    await cache.set(cacheKey, data, 15);
 
     res.json({ success: true, minutes, limit, minLength, data });
   } catch (error) {
@@ -195,15 +172,6 @@ app.get("/compare", async (req, res) => {
   const to = req.query.to ? new Date(req.query.to as string) : now;
 
   try {
-    // Check cache first
-    const cache = await MooseCache.get();
-    const cacheKey = `trends:compare:${words.join(",")}:${from.toISOString()}:${to.toISOString()}`;
-    const cached = await cache.get<any>(cacheKey);
-    if (cached) {
-      return res.json({ success: true, cached: true, ...cached });
-    }
-
-    // Query each word separately for clarity
     const results: Record<string, any[]> = {};
 
     for (const word of words) {
@@ -223,12 +191,7 @@ app.get("/compare", async (req, res) => {
       results[word] = await result.json();
     }
 
-    const response = { words, from, to, data: results };
-
-    // Cache for 30 seconds
-    await cache.set(cacheKey, response, 30);
-
-    res.json({ success: true, ...response });
+    res.json({ success: true, words, from, to, data: results });
   } catch (error) {
     console.error("[Trends API] Compare error:", error);
     res.status(500).json({
@@ -245,14 +208,6 @@ app.get("/stats", async (req, res) => {
   const { client, sql } = await getMooseUtils();
 
   try {
-    const cache = await MooseCache.get();
-    const cacheKey = "trends:stats";
-    const cached = await cache.get<any>(cacheKey);
-    if (cached) {
-      return res.json({ success: true, cached: true, ...cached });
-    }
-
-    // Get total unique words and total occurrences
     const statsQuery = sql`
       SELECT
         count(DISTINCT ${WordTrendsMV.targetTable.columns.word}) as uniqueWords,
@@ -264,9 +219,6 @@ app.get("/stats", async (req, res) => {
 
     const result = await client.query.execute(statsQuery);
     const stats = (await result.json())[0] || {};
-
-    // Cache for 60 seconds
-    await cache.set(cacheKey, stats, 60);
 
     res.json({ success: true, ...stats });
   } catch (error) {
