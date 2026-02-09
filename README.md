@@ -157,38 +157,32 @@ moose dev
 
 ## Architecture
 
-```
-Bluesky JetStream (WebSocket)
-         │
-         ▼
-┌─────────────────────┐
-│  Temporal Workflow  │
-│  (firehose.ts)      │
-└─────────────────────┘
-         │
-         ▼
-┌─────────────────────┐
-│  Kafka/Redpanda     │
-│  (BlueskyPost)      │
-└─────────────────────┘
-         │
-         ▼
-┌─────────────────────┐
-│  Transform          │
-│  (word extraction)  │
-└─────────────────────┘
-         │
-         ▼
-┌─────────────────────┐
-│  ClickHouse         │
-│  (WordOccurrence)   │
-└─────────────────────┘
-         │
-         ▼
-┌─────────────────────┐
-│  Dashboard API      │
-│  (trends.ts)        │
-└─────────────────────┘
+```mermaid
+flowchart TD
+    BSky["🦋 Bluesky JetStream\n(WebSocket)"]
+    Workflow["⏱️ Temporal Workflow\n(firehose.ts)"]
+    Cache[("Redis\n(cursor persistence)")]
+    Topic1["Redpanda Topic\nBlueskyPost"]
+    Table1[("ClickHouse Table\nBlueskyPost")]
+    Transform["Transform\n(bluesky-transforms.ts)\nword extraction + stop word filtering\n+ 10s interval bucketing"]
+    Topic2["Redpanda Topic\nWordOccurrence"]
+    Table2[("ClickHouse Table\nWordOccurrence")]
+    MV["Materialized View\nWordTrends\n(SummingMergeTree)"]
+    API["Trends API\n(trends.ts)\n/search · /top · /compare · /stats"]
+    APICache[("Redis\n(response cache)")]
+    WebApp["Next.js Dashboard\n(localhost:3000)"]
+
+    BSky -- "posts via WebSocket" --> Workflow
+    Workflow -- "save/load cursor" --> Cache
+    Workflow -- "batched sends\n(100 posts / 500ms)" --> Topic1
+    Topic1 --> Table1
+    Topic1 --> Transform
+    Transform --> Topic2
+    Topic2 --> Table2
+    Table2 --> MV
+    MV -- "aggregated queries" --> API
+    API -- "cache lookups\n(15-60s TTL)" --> APICache
+    API -- "JSON responses" --> WebApp
 ```
 
 ## Configuration
