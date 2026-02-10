@@ -190,38 +190,50 @@ moose dev
 
 ## Architecture
 
-```
-Bluesky JetStream (WebSocket)
-         │
-         ▼
-┌─────────────────────┐
-│  Temporal Workflow  │
-│  (firehose.ts)      │
-└─────────────────────┘
-         │
-         ▼
-┌─────────────────────┐
-│  Kafka/Redpanda     │
-│  (BlueskyPost)      │
-└─────────────────────┘
-         │
-         ▼
-┌─────────────────────┐
-│  Transform          │
-│  (word extraction)  │
-└─────────────────────┘
-         │
-         ▼
-┌─────────────────────┐
-│  ClickHouse         │
-│  (WordOccurrence)   │
-└─────────────────────┘
-         │
-         ▼
-┌─────────────────────┐
-│  Dashboard API      │
-│  (trends.ts)        │
-└─────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Sources
+        JetStream["Bluesky JetStream\n(WebSocket)"]
+    end
+
+    subgraph Ingestion
+        Workflow["Temporal Workflow\n(firehose.ts)"]
+        Ingest["POST /ingest/BlueskyPost"]
+    end
+
+    subgraph Streaming["Kafka / Redpanda"]
+        BSTopic[("BlueskyPost\ntopic")]
+        WOTopic[("WordOccurrence\ntopic")]
+    end
+
+    subgraph Transforms["Moose Transforms"]
+        BSTransform["BlueskyPost → BlueskyPost\n(bluesky-transforms.ts)"]
+        WOTransform["BlueskyPost → WordOccurrence\n(bluesky-transforms.ts)"]
+    end
+
+    subgraph Storage["ClickHouse"]
+        BSTable[("BlueskyPost\ntable")]
+        WOTable[("WordOccurrence\ntable")]
+        WTView[("WordTrends\nview")]
+    end
+
+    subgraph Serving
+        TrendsAPI["Trends API\n(trends.ts)"]
+        MCP["MCP Server"]
+    end
+
+    JetStream --> Workflow --> Ingest --> BSTopic
+
+    BSTopic --> BSTransform
+    BSTopic --> WOTransform
+    WOTransform --> WOTopic
+
+    BSTopic --> BSTable
+    WOTopic --> WOTable
+    WOTable --> WTView
+
+    WTView --> TrendsAPI
+    WTView --> MCP
 ```
 
 ## Configuration
